@@ -84,23 +84,24 @@ class EMA(nn.Module):
 # -----------------------------------------------------------------
 class ECPConv(nn.Module):
     """
-    Paper Figure 2: Enhanced Channel-wise Partial Convolution with Dynamic Selection.
-    Core Logic:
-    1. Calculate channel weights.
+    Paper Figure 2 & Algorithm A1: Enhanced Channel-wise Partial Convolution with Dynamic Selection.
+    Core Logic (Following Paper Exactly):
+    1. Calculate channel weights via GAP + FC layers.
     2. Sort and select top-k channels dynamically.
-    3. Process top-k with RepConv, rest with 1x1 Conv.
+    3. Process top-k with RepConv (standard conv, g=1).
+    4. Restore processed channels to original index positions.
     """
     def __init__(self, c1, c2, k=3, s=1, ratio=0.25):
         super().__init__()
         self.c1 = c1
         self.c2 = c2
-        self.s = s  # stride 저장
-        # ratio에 따라 RepConv로 보낼 채널 수(k_channels) 결정
+        self.s = s
+        # ratio에 따라 RepConv로 보낼 채널 수(k_channels) 결정 (논문 권장: C/4)
         self.k_channels = int(c1 * ratio) 
         self.rest_channels = c1 - self.k_channels
         
         # 1. Channel Selection Network (Weight Generator)
-        # GAP -> FC -> ReLU -> FC -> Sigmoid
+        # 논문: GAP -> FC1 -> ReLU -> FC2 -> Sigmoid
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.selection_net = nn.Sequential(
             nn.Conv2d(c1, c1 // 16, 1, bias=False),
@@ -110,69 +111,60 @@ class ECPConv(nn.Module):
         )
         
         # 2. Processing Modules
-        # Selected channels -> RepConv (Complex spatial features)
-        self.rep_conv = RepConv(self.k_channels, self.k_channels, k, s, p=k//2, g=self.k_channels)
+        # 논문 Algorithm A1: RepConv on selected channels (일반 Conv, g=1)
+        # 수정: g 파라미터 제거하여 채널 간 상호작용 허용
+        self.rep_conv = RepConv(self.k_channels, self.k_channels, k, s, p=k//2)
         
-        # Remaining channels -> 1x1 Conv (Simple feature preservation)
-        # stride를 동일하게 적용하여 출력 크기 일치
-        if s == 1:
-            self.rest_conv = Conv(self.rest_channels, self.rest_channels, 1, 1)
-        else:
-            # stride > 1일 때는 3x3 conv로 다운샘플링
-            self.rest_conv = Conv(self.rest_channels, self.rest_channels, 3, s)
+        # 논문 3.4절: "unselected channels... utilized by two 1×1 convolutions
+        # of the intermediate entrainment BN and ReLU functions"
+        self.rest_conv = nn.Sequential(
+            Conv(c1, c1, 1, s, act=True),   # 1x1 Conv + BN + ReLU (stride 적용)
+            Conv(c1, c1, 1, 1, act=False)   # 1x1 Conv (no activation)
+        )
         
         # 3. Channel Projection (c1 -> c2)
-        # ECPConv 후 출력 채널을 c2로 변환
         self.proj = Conv(c1, c2, 1, 1) if c1 != c2 else nn.Identity()
 
     def forward(self, x):
         B, C, H, W = x.shape
         
         # -------------------------------------------------------
-        # Step 1: Generate Channel Weights
+        # Step 1: Generate Channel Weights (논문 Algorithm A1, Line 3-8)
         # -------------------------------------------------------
-        # w: [B, C, 1, 1] -> [B, C]
         w = self.selection_net(self.avg_pool(x)).view(B, C)
         
         # -------------------------------------------------------
-        # Step 2: Dynamic Selection (Sort & Split)
+        # Step 2: Sort & Select Top-K (논문 Algorithm A1, Line 9-12)
         # -------------------------------------------------------
-        # 상위 k개의 인덱스를 추출 (Indices of top-k importance)
-        # topk_idx: [B, k_channels]
         _, topk_idx = torch.topk(w, self.k_channels, dim=1)
         
-        # Gather를 위해 배치 차원 인덱스 생성
-        # batch_idx: [B, 1] -> [B, k_channels]로 확장
+        # 배치 인덱싱을 위한 준비
         batch_idx = torch.arange(B, device=x.device).unsqueeze(1).expand(-1, self.k_channels)
         
-        # A. 선택된 채널 (Selected Channels) 추출
-        # x: [B, C, H, W] -> x_selected: [B, k_channels, H, W]
-        x_selected = x[batch_idx, topk_idx]
-        
-        # B. 나머지 채널 (Rest Channels) 추출
-        # 마스킹 기법을 사용하여 선택되지 않은 인덱스만 필터링
-        mask = torch.zeros(B, C, dtype=torch.bool, device=x.device)
-        # scatter_로 topk 위치를 True로 마킹
-        mask.scatter_(1, topk_idx, True) 
-        # ~mask(False인 곳)를 선택하여 가져옴. 
-        # view를 통해 [B, rest_channels, H, W] 형태로 복원
-        x_rest = x[~mask].view(B, self.rest_channels, H, W)
+        # 선택된 채널 추출
+        x_selected = x[batch_idx, topk_idx]  # [B, k_channels, H, W]
         
         # -------------------------------------------------------
-        # Step 3: Independent Processing
+        # Step 3: RepConv on Selected Channels (논문 Algorithm A1, Line 13)
         # -------------------------------------------------------
-        # 중요한 채널은 구조적 특징 학습 (RepConv)
-        y_selected = self.rep_conv(x_selected)
+        y_selected = self.rep_conv(x_selected)  # [B, k_channels, H_out, W_out]
         
-        # 덜 중요한 채널은 정보 유지 (1x1 Conv)
-        y_rest = self.rest_conv(x_rest)
+        # stride > 1인 경우 출력 크기 계산
+        H_out, W_out = y_selected.shape[2], y_selected.shape[3]
         
         # -------------------------------------------------------
-        # Step 4: Fusion
+        # Step 4: Restore to Original Positions (논문 Algorithm A1, Line 14)
+        # X[Y[k]] = Z[k] - 원래 인덱스 위치에 삽입
         # -------------------------------------------------------
-        # 원래 채널 순서로 복구할 필요 없이 피처를 합쳐서 다음 레이어로 전달
-        # (CNN은 채널 순서보다 채널 내의 정보가 중요하므로 Concat만으로 충분)
-        out = torch.cat([y_selected, y_rest], dim=1)
+        # 나머지 채널에 1x1 Conv 2개 적용 (논문 3.4절)
+        out = self.rest_conv(x)
+        
+        # 선택된 채널 위치에 처리된 결과 삽입 (scatter 연산)
+        # topk_idx를 H, W 차원에 맞게 확장
+        topk_idx_expanded = topk_idx.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, H_out, W_out)
+        
+        # scatter를 사용하여 원래 위치에 삽입
+        out.scatter_(1, topk_idx_expanded, y_selected)
         
         # Channel projection to c2
         return self.proj(out)
@@ -212,7 +204,11 @@ class ECPConvBlock(nn.Module):
 # 3. RCM (Rectangular Self-Calibration Module) - Neck Component
 # -----------------------------------------------------------------
 class RCM(nn.Module):
-    """ Paper Figure 6: Rectangular Self-Calibration Module """
+    """
+    Paper Figure 6 & Eq(5): Rectangular Self-Calibration Module
+    논문 Eq(5): Qc = sigmoid(SConv_{k×1}(relu(BN(SConv_{1×k}(y)))))
+    순차 처리: 1×k (가로) → BN → ReLU → k×1 (세로) → Sigmoid
+    """
     def __init__(self, c1, c2, k=11): # k is strip conv kernel size
         super().__init__()
         self.dw_conv = Conv(c1, c1, 3, 1, g=c1, act=False) # DWConv 3x3
@@ -221,14 +217,10 @@ class RCM(nn.Module):
         self.pool_h = nn.AdaptiveAvgPool2d((None, 1))
         self.pool_w = nn.AdaptiveAvgPool2d((1, None))
         
-        # Strip Convolutions (Eq 5)
-        # H-direction: 1xK
-        self.sconv_h_1 = Conv(c1, c1, (1, k), 1, act=True) # BN+ReLU included in Conv
-        self.sconv_h_2 = Conv(c1, c1, (k, 1), 1, act=False)
-        
-        # V-direction
-        self.sconv_v_1 = Conv(c1, c1, (k, 1), 1, act=True)
-        self.sconv_v_2 = Conv(c1, c1, (1, k), 1, act=False)
+        # Strip Convolutions - 논문 Eq(5) 순차 처리
+        # SConv_{1×k} → BN → ReLU → SConv_{k×1} → Sigmoid
+        self.sconv_1xk = Conv(c1, c1, (1, k), 1, act=True)   # 1×k + BN + ReLU
+        self.sconv_kx1 = Conv(c1, c1, (k, 1), 1, act=False)  # k×1 (no activation, sigmoid later)
         
         self.sigmoid = nn.Sigmoid()
         self.mlp = nn.Sequential(
@@ -240,23 +232,19 @@ class RCM(nn.Module):
         # RCA Process
         identity = x
         
-        # Context info
-        x_h = self.pool_h(x)
-        x_w = self.pool_w(x)
-        y = x_h + x_w # Broadcast addition
+        # Eq(4): Context info via pooling
+        x_h = self.pool_h(x)  # [B, C, H, 1]
+        x_w = self.pool_w(x)  # [B, C, 1, W]
+        y = x_h + x_w  # Broadcast addition [B, C, H, W]
         
-        # Self-Calibration Function (Eq 5)
-        # Horizontal Branch
-        q_h = self.sconv_h_2(self.sconv_h_1(y))
-        # Vertical Branch
-        q_v = self.sconv_v_2(self.sconv_v_1(y))
+        # Eq(5): Self-Calibration Function - 순차 처리 (논문 수식 그대로)
+        # Qc = sigmoid(SConv_{k×1}(relu(BN(SConv_{1×k}(y)))))
+        qc = self.sigmoid(self.sconv_kx1(self.sconv_1xk(y)))
         
-        qc = self.sigmoid(q_h + q_v)
-        
-        # Fusion (Eq 6)
+        # Eq(6): Fusion - DWConv output과 Qc의 Hadamard product
         z = self.dw_conv(x) * qc
         
-        # Final Output (Eq 7)
+        # Eq(7): Final Output with residual
         return self.mlp(z) + identity
 
 # -----------------------------------------------------------------

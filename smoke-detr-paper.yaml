@@ -3,7 +3,7 @@
 # Backbone: ResNet-18 Size with ECPConvBlock & EMA
 # Neck: MFFPN (RCM + RepC3)
 
-nc: 1 # 클래스 수 (연기)
+nc: 2 # 클래스 수 (smoke=0, fire=1)
 scales:
   # [depth, width, max_channels]
   # ResNet-18은 [2, 2, 2, 2] 블록 반복을 가짐.
