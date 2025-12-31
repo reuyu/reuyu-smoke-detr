@@ -1,0 +1,116 @@
+=== Paragraph 59 (found: RCM) ===
+subjected to a Rectangular Self-Calibration Module (RCM) in both fused and independent forms to enhance the foreground features present within the images. The RCM employs stripe convolutions in both horizontal and vertical directions, which not only enhances the learning capability of deformable objects but also reduces the parameter count in the feature fusion section.
+
+=== Paragraph 63 (found: pool) ===
+Deep learning approaches based on Computer Vision, renowned for their robust feature extraction capabilities, have emerged as a promising approach in smoke detec- tion. By effectively learning the multifaceted characteristics of smoke, these methods achieve higher accuracy than traditional techniques.  Common Computer Vision tasks   in smoke detection encompass image classification, semantic segmentation, and object detection. Li et al. [15] introduced a novel framework that integrates traditional methods into Convolutional Neural Networks (CNNs) for wildfire smoke detection, specifically tailored for smoke image classification. This framework comprises a candidate smoke region segmentation strategy and a neural network architecture. The segmentation strategy removes complex backgrounds from wildfire smoke images, while dilated convolutions combined with DenseBlock enable the extraction of multi-scale features, thereby enhancing the accuracy of smoke classification. Wang et al. [16] proposed a hybrid network combining CNNs with Pyramid Gaussian Pooling (PGP) and a Transformer for smoke segmentation, achieving State-Of-The-Art (SOTA) performance that surpasses many previous segmen- tation networks. While image classification models excel in accuracy, they are limited in their ability to reflect the precise locations of smoke generation in real time. Semantic segmentation models, while capable of fine-grained image segmentation, are challenged by the ambiguous shapes of smoke, which make it difficult to annotate datasets. Furthermore, the computational demands of pixel-wise classification in semantic segmentation tasks pose practical limitations.
+
+=== Paragraph 69 (found: pool) ===
+In addition to better identifying smoke objects, the DETR model boasts unique ad- vantages. In anchor-based object detection models, post-processing steps such as Non- Maximum Suppression (NMS) are typically necessary because the model may generate multiple overlapping detection boxes that need to be merged or filtered to reduce redun- dancy. However, the NMS step requires time, hindering fast inference. In contrast, DETR employs the Hungarian matching algorithm to match predicted boxes with ground truth boxes, optimizing detection speed and accuracy. It achieves fast inference without NMS, significantly reducing the time required for post-processing—a capability not even achieved by the widely used Yolo series models. Recently, scholars have applied DETR-like models to smoke detection. For example, Huang et al. [24] integrated Multi-Scale Contextual Contrast Local Feature Module (MCCL) and Dense Pyramid Pooling Module (DPPM) into the DETR model, proposing an innovative DETR-based smoke detection model that significantly improved accuracy. Liang et al. [25] proposed FSH-DETR, a DETR model incorporating the Separate Single-scale Feature Interaction Module (SSFI) and the CNN-based cross-scale feature fusion module (CCFM), for multi-scale fire and smoke detection. These studies demonstrate the feasibility of Transformer-based smoke detection.
+
+=== Paragraph 101 (found: pool) ===
+Algorithm A1 in Appendix A delineates the code implementation of Enhanced Channel-wise Partial Convolution. Initially, global average pooling is applied across the channels of the input feature maps to obtain a feature vector x1, x2, x3, ..., xc of length C. Subsequently, we employ two fully connected layers to generate the weights for each fea- ture channel. This process yields a weight vector y1, y2, y3, ..., yc . Ultimately, the weight vectors are transformed into the range 0 1 through the application of a sigmoid function, thereby indicating the relative importance of each feature channel. We order the subscripts of the feature channels according to their importance. The aforementioned result is sorted by their subscripts according to the importance of the feature channels to obtain a new vec- tor n1, n2, ..., nc , where ni represents the channel number corresponding to the channel with the i-th weight. The initial K elements are retained as the basis for selecting channels to perform convolution operations, yielding n1, n2, ..., nk , k < c, which is referred to as the “selection vector”. According to the index in the selection vector, the corresponding channel from the original input image is selected for feature extraction, and this process is implemented through RepConv. Subsequently, the convolution result is reinserted into the original feature map in accordance with the channel index indicated in the selection vector. By generating the selection vectors prior to the convolution, this approach enhances the capacity of Partial Convolution to extract crucial channel information, thereby improving the Precision of Partial Convolution.
+
+=== Paragraph 185 (found: pool) ===
+Avg Pool
+
+=== Paragraph 204 (found: pool) ===
+Avg Pool C/R×1×1
+
+=== Paragraph 231 (found: pool) ===
+Parallel Sub-Network Reconstruction: EMA employs a multi-branch architecture where the input sub-feature map is divided into three independent branches. Two branches, designated as 1 1 branches, are responsible for extracting feature distributions along height and width dimensions. The third branch, termed the 3 3 branch, focuses on encoding spatial structural features. The two 1 1 branches initially perform independent horizontal and vertical average pooling to obtain feature encoding vectors in their respective directions.   The horizontal and vertical average pooling processes can be formulated     as follows:
+
+=== Paragraph 232 (found: Avg) ===
+AvgH (H
+
+=== Paragraph 238 (found: Avg) ===
+AvgW W
+
+=== Paragraph 249 (found: vertical) ===
+where xc represents the input feature of the c-th channel, and xc(H, i) represents the i-th value in the horizontal direction when the height is H in the c-th channel; similarly, xc(W, i) represents the i-th value in the vertical direction when the width is W in the c-th chan- nel. The two feature encoding vectors are concatenated along the height dimension and fused through a 1 1 convolution operation. The fused result is then split and processed through sigmoid functions to generate two attention weight vectors. These attention weight vectors are subsequently aggregated with feature map X through multiplication, producing a feature map that integrates both horizontal and vertical information. Simul- taneously,  in the 3    3 branch,  the input sub-feature map undergoes 3     3 convolution  to extract spatial structural features from the original input. This approach enables EMA to not only encode inter-channel information for adjusting channel importance but also preserve precise spatial structural information within channels. Additionally, the parallel structure helps the network avoid excessive sequential processing, efficiently utilizing computational resources.
+
+=== Paragraph 251 (found: pool) ===
+1 1 branch undergoes normalization. Since this normalization occurs only within each subgroup, we term it group normalization. Information is then compressed through 2D global average pooling, described by the following formula:
+
+=== Paragraph 254 (found: Avg) ===
+Avg
+
+=== Paragraph 263 (found: pool) ===
+3 3 branch output undergoes 2D global average pooling followed by a softmax operation. It then undergoes matrix multiplication with the group-normalized global information feature map, producing a second spatial attention map containing precise spatial informa- tion. These two spatial attention maps are combined and processed through a Sigmoid
+
+=== Paragraph 290 (found: RCM) ===
+In the context of smoke detection, it is not uncommon for objects such as clouds and fog to be mistaken for smoke, which can lead to false detection phenomena. Meanwhile, thin smoke can exhibit low discriminability from background objects, resulting in missed detections. From a visual perspective, this issue can be addressed by focusing on the foreground of smoke and enhancing the ability to distinguish it from the background. CGRSeg [36] introduces a Rectangular Self-Calibration Module (RCM), which is specifically designed for the object foreground. Based on the RCM, we have devised a Multi-Scale Foreground-Focus Fusion Pyramid Network (MFFPN) to enhance the model’s capacity to focus on foreground objects at varying scales. The overall architecture is illustrated in Figure 5, which depicts two components: multi-scale feature foreground enhancement and foreground feature fusion modules. The multi-Scale feature foreground enhancement module integrates features from multiple scales. It applies the RCM for foreground-focused fusion, yielding a foreground-focused feature map incorporating multiple scales. The foreground feature fusion module employs RCM to process feature maps of varying scales, thereby generating independent Multi-Scale Foreground-Focused feature maps. These are subsequently integrated with the output of the multi-scale feature foreground enhancement module, resulting in an information feature map that encompasses both fused and independent foreground-focused maps. Ultimately, the foreground-focused feature maps of disparate scales are transformed into a vector from top to bottom, representing the output of the encoder.
+
+=== Paragraph 295 (found: Rectangular) ===
+Rectangular Self-Calibration Module
+
+=== Paragraph 296 (found: RCM) ===
+In MFFPN, the RCM enables the model to focus more on the foreground. The intri- cate architecture of the RCM is depicted in Figure 6, encompassing a Rectangular Self- Calibration Attention, a BN layer, and a Multi-Layer Perceptron (MLP) layer. The Rectangu- lar Self-Calibration (RCA) initially captures contextual information in two dimensions using horizontal pooling and global pooling. Subsequently, this information is fused through the broadcast addition of vectors, enabling the modeling of significant foreground information. The process can be mathematically represented as follows:
+
+=== Paragraph 297 (found: Avg) ===
+y = AvgH (Fin) ⊕ Avgw (Fin)	(4)
+
+=== Paragraph 298 (found: pool) ===
+where AvgH (x) represents horizontal pooling of the input x,  Avgw  represents vertical
+
+=== Paragraph 300 (found: pool) ===
+pooling of the input x, and ⊕ represents broadcast vector addition.
+
+=== Paragraph 303 (found: Rectangular) ===
+Figure 6. Components of the Rectangular Self-Calibration Module.
+
+=== Paragraph 305 (found: calibration) ===
+The modeling information obtained is calibrated through a self-calibration function to derive an attentional feature map that provides a more accurate representation of the foreground information. The self-calibration function incorporates strip convolutions in both the horizontal and vertical dimensions. At the outset, horizontal strip convolution  is deployed to calibrate the shape in the horizontal plane. Subsequently, a BN layer is employed for normalization, and a ReLU activation function is introduced for non-linearity. Subsequently, vertical strip convolution is employed to calibrate the shape in the vertical dimension, with the application of the sigmoid function to introduce non-linearity. By decoupling the convolutions in these two dimensions, the number of parameters is reduced while enabling the model to adapt to the uncertain shape characteristics of smoke. The self-calibration function can be mathematically represented as follows:
+
+=== Paragraph 307 (found: calibration) ===
+where y represents the input of the self-calibration function, SConvn×m represents the strip convolution, sigmoid(x) represents the Sigmoid function, and relu(x) represents the ReLU function.
+
+=== Paragraph 308 (found: calibration) ===
+Finally, a fusion function is utilized to integrate the original input with the output processed by the self-calibration function, thereby enhancing the weight of foreground fea- tures in the image. Specifically, 3 3 DepthWise Convolution (DWConv) is first employed to extract features from the original image. Then, it leverages the Hadamard product to compute the output of self-calibrated features, thereby weighting the foreground features. The fusion function can be mathematically represented as follows:
+
+=== Paragraph 313 (found: RCM) ===
+To augment the representation of features, we incorporate a Batch BN layer and an MLP layer subsequent to the RCA and utilize a residual structure to form the RCM:
+
+=== Paragraph 314 (found: RCM) ===
+RCM(Fin) = MLP(BN(DWConv3×3(Fin) ⊙ Qc)) + Fin	(7)
+
+=== Paragraph 316 (found: RCM) ===
+The multi-scale feature foreground Enhancement module centers around pyramid context extraction, as illustrated in Figure 7. It is responsible for extracting and fusing feature map information at different scales. Then, an enhanced representation of the foreground is obtained through RCM. As previously stated, the set of input features includes {S3, S4, F5}. Subsequently, S3, S4, and F5 are downsampled to the size of H  × W
+
+=== Paragraph 317 (found: pool) ===
+through the application of average pooling and are then concatenated together to generate
+
+=== Paragraph 318 (found: RCM) ===
+the pyramid feature F6. F6 is then fed into three repetitive RCMs for pyramid feature interaction to extract scale-aware semantic features. The following equation can describe this process:
+
+=== Paragraph 319 (found: RCM) ===
+S3′, S4′, F5′ = Split(RCM(Concat(Avg(S3, 8), Avg(S4, 4), Avg(F5, 2))))	(8)
+
+=== Paragraph 320 (found: pool) ===
+where  Avg(F, x) represents average pooling with downsampling x times on feature map
+
+=== Paragraph 326 (found: RCM) ===
+In the Foreground Feature Fusion Module, feature maps of different scales are in- dependently processed through RCMs and fused with multi-scale feature foreground Enhancement outputs. The feature fusion process begins with the F5 feature map. After processing through RCM, it undergoes interpolated multiplication with F5′ to generate P5. Subsequently, the S4 feature map performs interpolated addition with P5, followed by in- terpolated multiplication with S4′ to achieve feature fusion across different scales, resulting in P4. Similarly, after RCM processing, the S3 feature map undergoes interpolated addition with P4, followed by interpolated multiplication with S3′ to produce P3. Through these operations, we obtain feature maps P3, P4, and P5, which have undergone foreground focusing through dual pathways and further fusion. This process can be mathematically formulated as follows:
+
+=== Paragraph 328 (found: RCM) ===
+P5 = RCM(F5) ⊙ F5′	(9)
+
+=== Paragraph 329 (found: RCM) ===
+P4 = RCM(S4) ⊕ P5 ⊙ S4′	(10)
+
+=== Paragraph 330 (found: RCM) ===
+P3 = RCM(S3) ⊕ S4 ⊙ S3′	(11)
+
+=== Paragraph 331 (found: RCM) ===
+where RCM(x) represents the processing of the input x through the RCM, denotes interpolation addition, and denotes interpolation multiplication. Interpolation addition performs matrix addition on two elements after upsampling the feature map of a smaller
+
+=== Paragraph 534 (found: strip) ===
+Firstly, we introduced the Multi-Scale Feature Fusion Pyramid Network (MFFPN) to replace the feature fusion module of the baseline model. This substitution led to significant improvements across multiple performance metrics: Precision increased by 3.1 percentage points, Recall rose by 3.4 percentage points, mAP50 saw a 2.5 percentage point boost, and mAP95 improved by 1.3 percentage points. These enhancements demonstrate the effec- tiveness of the multi-scale effective fusion and foreground-focused strategies in the context of smoke detection. Moreover, by incorporating stripe convolutions in both horizontal and vertical directions within the feature fusion process to decouple the convolutions, the computational load is reduced efficiently. Specifically, the computational complexity decreased from 56.9 G to 48.2 G, representing a notable 15.2% reduction.
+
+=== Paragraph 579 (found: RCM) ===
+Based on the RT-DETR model, this paper presents Smoke-DETR, a novel object detec- tion model specifically designed for smoke detection in outdoor early fire warning systems. The model incorporates various improvements targeting the unique characteristics of smoke. Considering the computational limitations of outdoor edge devices, we introduced improvements using Partial Convolution concepts without significantly increasing model parameters and computational complexity. We proposed the ECPConv for the backbone network using a channel selection strategy. To address the challenges of irregular smoke shapes and subtle features, we incorporated a novel EMA to enhance the feature extraction capabilities of the backbone network. While these backbone improvements significantly increased the model’s Precision, Recall, and mAP, detection errors still occurred when background and foreground similarities were high. To address this problem, we developed the MFFPN based on RCM to enhance the model’s foreground focus capabilities. Extensive experiments demonstrated the superior performance of Smoke-DETR in smoke detection. Firstly, Smoke-DETR achieved the best results on multiple metrics in comparative experi- ments with advanced models. Compared to the baseline RT-DETR model, Smoke-DETR showed improvements of 3.6, 3.6, 3.8, and 2.2 percentage points in Precision, Recall, mAP50, and mAP95 respectively. It also reduced parameters by 17% and computational complexity by 23.9%. Detection result visualizations demonstrated Smoke-DETR’s superior smoke detection accuracy compared to that of RT-DETR. Secondly, ablation experiments were designed to explore the performance improvements of the model progressively after incor- porating ECPConv, EMA, and MFFPN individually, as well as when integrating all three methods. Meanwhile, the heatmaps also demonstrated the model’s enhanced ability to focus on smoke with the sequential addition of different improvements. Finally, some com- parative experiments were conducted separately on the backbone network, feature fusion network, and loss function, and the methods we adopted all exhibited higher accuracy. The comprehensive experimental results, including comparison, ablation, and module- specific experiments supported by detection visualizations and heatmaps, demonstrate the exceptional performance of Smoke-DETR in smoke detection.
+
+=== Paragraph 603 (found: Avg) ===
+5:	yi = Avgc (x)
+
+=== Paragraph 640 (found: pool) ===
+Wang, G.; Yuan, F.; Li, H.; Fang, Z. A pyramid Gaussian pooling based CNN and transformer hybrid network for smoke segmentation. IET Image Process. 2024, 18, 3206–3217. https://doi.org/10.1049/ipr2.13166.

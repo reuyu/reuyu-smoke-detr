@@ -1,23 +1,57 @@
 from ultralytics import RTDETR
+import os
+import glob
+import matplotlib.pyplot as plt
 
 def main():
-    last_ckpt = r"C:\Users\user\Documents\Projects\smoke_jetson_project\teacher_l_model_final8\weights\last.pt"
-    data_yaml_path = r"C:\Users\user\Documents\Projects\ultralytics\smoke_dataset.yaml"
+    # Configuration
+    # Uses the user-edited smoke-detr-l.yaml (Standard ResNet + MFFPN likely)
+    model_yaml = r"C:\Users\user\Documents\Projects\smoke-detr-l.yaml"
+    data_yaml = r"C:\Users\user\Documents\Projects\smoke_dataset.yaml" 
+    project_dir = r"C:\Users\user\Documents\Projects\runs\detect"
+    run_name = "smoke_detr_teacher"
+    
+    # Auto-resume logic
+    last_ckpt = os.path.join(project_dir, run_name, "weights", "last.pt")
+    resume_training = False
+    
+    if os.path.exists(last_ckpt):
+        print(f"Resuming Smoke-DETR training from {last_ckpt}...")
+        try:
+            model = RTDETR(last_ckpt)
+            resume_training = True
+        except Exception as e:
+            print(f"Failed to load checkpoint: {e}. Starting fresh.")
+            model = RTDETR(model_yaml)
+    else:
+        print("Starting fresh Smoke-DETR training...")
+        model = RTDETR(model_yaml)
 
-    print("Smoke-DETR (Teacher) 모델을 **기존 세션에서 재개(resume)** 합니다...")
-
-    model = RTDETR(last_ckpt)  # ✅ 마지막 체크포인트에서 모델 불러오기
-
+    # Train
+    # Note: Using batch=2, workers=0 for stability parallel with Baseline
     results = model.train(
-        data=data_yaml_path,
-        resume=True,  # True 여도 이제 경로가 명확히 지정됨
+        data=data_yaml,
+        epochs=200,
+        imgsz=640,
+        batch=2,
         workers=0,
-        project=r'C:\Users\user\Documents\Projects\smoke_jetson_project',
-        name='teacher_l_model_final8',
+        device=0,
+        project=project_dir,
+        name=run_name,
+        exist_ok=True,
+        resume=resume_training,
+        classes=[0], # Filter: Train ONLY on Class 0 (Smoke)
+        amp=False    # Disable AMP for stability
     )
 
-    print("Teacher 모델 학습 완료!")
-    print(f"최종 모델은 {model.trainer.best} 에 저장되었습니다.")
+    print("Smoke-DETR Training Complete.")
+    print(f"Results saved to {os.path.join(project_dir, run_name)}")
+
+    # Validation & Analysis (Basic)
+    # Ultralytics automatically saves results.csv and confusion_matrix.png
+    # We can explicitly validate if needed, but .train() includes val at end.
+    
+    # Generate/Move graphs is handled by Ultralytics automatically.
 
 if __name__ == '__main__':
     main()

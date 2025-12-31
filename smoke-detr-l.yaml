@@ -1,23 +1,22 @@
 # C:\Users\user\Documents\Projects\smoke-detr-l.yaml (수정본)
 
 # 파라미터
-nc: 1  # 클래스 수 (연기 1개)
+nc: 1 # 클래스 수 (연기 1개)
 scales:
   # 기존 논문에서 사용된 ResNet 스케일과 유사하게 맞춥니다 (r18.yaml 참고)
-  l: [0.33, 0.25, 256] 
+  l: [0.33, 0.25, 256]
 
 # 백본
 backbone:
   # [from, repeats, module, args]
   # 0: ResNetLayer가 ResNetBlock을 호출 -> block.py가 ECPConvBlock으로 교체
-  #    parse_model은 c2=64로 계산. ch=[3, 64]
-  - [-1, 1, ResNetLayer, [3, 64, 3, True]]  
-  # 1: parse_model은 c2=128*4=512로 계산. ch=[3, 64, 512]
-  - [-1, 1, ResNetLayer, [64, 128, 4, False, 2]]  
-  # 2: parse_model은 c2=256*4=1024로 계산. ch=[3, 64, 512, 1024]
-  - [-1, 1, ResNetLayer, [512, 256, 6, False, 2]] 
-  # 3: parse_model은 c2=512*4=2048로 계산. ch=[3, 64, 512, 1024, 2048]
-  - [-1, 1, ResNetLayer, [1024, 512, 3, False, 2]] 
+  - [-1, 1, ResNetLayer, [3, 64, 2, True]]
+
+  - [-1, 1, ResNetLayer, [64, 128, 2, False]]
+
+  - [-1, 1, ResNetLayer, [128, 256, 2, False]]
+
+  - [-1, 1, ResNetLayer, [256, 512, 2, False]]
 
   # 피처맵 추출. [c2, k, s]
   - [1, 1, Conv, [256, 1, 1]] # 4 (s3). from 1 (c1=512). c2=256. ch.append(256)
@@ -26,16 +25,21 @@ backbone:
 
 # 헤드 (넥 + 디코더)
 head:
-  - [6, 1, AIFI, [1024, 8]]  # 7. from 6 (c1=256). args=[256, 1024, 8]. c2=256. ch.append(256)
-  - [-1, 1, Conv, [256, 1, 1]]  # 8. (f5). from 7 (c1=256). c2=256. ch.append(256)
+  - [6, 1, AIFI, [1024, 8]] # 7. from 6 (c1=256). args=[256, 1024, 8]. c2=256. ch.append(256)
+  - [-1, 1, Conv, [256, 1, 1]] # 8. (f5). from 7 (c1=256). c2=256. ch.append(256)
 
   # 9: MFFPN
   # from = [s3(4), s4(5), f5(8)]
   # MFFPN(in_channels=[256, 256, 256])
   # MFFPN은 리스트를 반환하므로, parse_model은 c2를 ch[8] (256)로 계산. ch.append(256)
   - [[4, 5, 8], 1, MFFPN, [[256, 256, 256]]]
-      
+
   # 10: RTDETRDecoder
   # from = 9. MFFPN(9)이 리스트를 반환했으므로, y[9]는 리스트입니다.
   # RTDETRDecoder는 이 리스트를 입력(x)으로 받습니다.
-  - [9, 1, RTDETRDecoder, [nc, 256, 300, 4, 8, 6, 1024, 0.0, 'relu', -1, 100, 0.5, 1.0, False]]
+  - [
+      9,
+      1,
+      RTDETRDecoder,
+      [nc, 256, 300, 4, 8, 6, 1024, 0.0, "relu", -1, 100, 0.5, 1.0, False],
+    ]

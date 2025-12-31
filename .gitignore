@@ -1,0 +1,29 @@
+# Datasets and Results
+datasets/
+runs/
+evaluation_results/
+weights/
+
+# Model Weights
+*.pt
+*.pth
+*.onnx
+
+# Logs and Debug
+*.log
+error_log.txt
+full_debug_log.txt
+error_debug_log.txt
+debug_redirect.py
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/

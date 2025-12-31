@@ -1,0 +1,47 @@
+# Smoke-DETR Paper Spec Implementation
+# Based on fire-07-00488.pdf
+# Backbone: ResNet-18 Size with ECPConvBlock & EMA
+# Neck: MFFPN (RCM + RepC3)
+
+nc: 1 # 클래스 수 (연기)
+scales:
+  # [depth, width, max_channels]
+  # ResNet-18은 [2, 2, 2, 2] 블록 반복을 가짐.
+  # width expansion은 1.0 (BasicBlock 기준)
+  r18: [1.0, 1.0, 512]
+
+backbone:
+  # [from, repeats, module, args]
+  # ECPConvBlock args: [c2, s] (c1은 자동으로 이전 레이어에서 가져옴)
+  # s=1: 크기 유지, s=2: 다운샘플링
+  - [-1, 1, Conv, [64, 3, 2]] # 0-P1/2
+  - [-1, 1, nn.MaxPool2d, [3, 2, 1]] # 1-P2/4
+
+  # Layer 1 (S2) - 2 blocks, stride=1 (크기 유지)
+  - [-1, 2, ECPConvBlock, [64, 1]] # 2
+
+  # Layer 2 (S3) - 2 blocks, 첫 블록만 stride=2로 다운샘플링
+  - [-1, 1, ECPConvBlock, [128, 2]] # 3-P3/8 (다운샘플)
+  - [-1, 1, ECPConvBlock, [128, 1]] # 4
+
+  # Layer 3 (S4) - 2 blocks
+  - [-1, 1, ECPConvBlock, [256, 2]] # 5-P4/16 (다운샘플)
+  - [-1, 1, ECPConvBlock, [256, 1]] # 6
+
+  # Layer 4 (S5) - 2 blocks
+  - [-1, 1, ECPConvBlock, [512, 2]] # 7-P5/32 (다운샘플)
+  - [-1, 1, ECPConvBlock, [512, 1]] # 8
+
+head:
+  - [-1, 1, Conv, [256, 1, 1]] # 9. Channel Projection for AIFI (512->256)
+  - [-1, 1, AIFI, [256, 8]] # 10. AIFI (S5 처리)
+  - [6, 1, Conv, [256, 1, 1]] # 11. Project S4 (256->256)
+  - [4, 1, Conv, [256, 1, 1]] # 12. Project S3 (128->256)
+
+  # MFFPN (Multi-Scale Foreground-Focus Fusion Pyramid Network)
+  # Inputs: [S3(12), S4(11), F5(10)]
+  # SmokeMFFPN 내부에서 RCM, RepC3 처리 후 [C1, C2, C3] 반환
+  - [[12, 11, 10], 1, SmokeMFFPN, [256]] # 13. MFFPN Output
+
+  # Detection Head (RT-DETR Decoder)
+  - [[13], 1, RTDETRDecoder, [nc, 256, 300, 4, 8, 3]] # 14. Scale=256, 300 queries
