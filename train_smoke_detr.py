@@ -16,6 +16,7 @@ import os
 import sys
 import json
 import torch
+import glob
 import datetime
 from pathlib import Path
 from ultralytics import RTDETR
@@ -57,15 +58,47 @@ def train_smoke_detr():
     print("=" * 60)
     
     # =========================================
-    # 2. 모델 초기화 (이미 위에서 수행됨)
+    # 2. 모델 초기화 (Resume 로직 포함)
     # =========================================
-    # model = RTDETR(model_yaml) # 중복 제거
     
+    # 최근 학습 폴더 찾기
+    runs_dir = "runs/smoke_detr"
+    train_dirs = glob.glob(os.path.join(runs_dir, "train_*"))
+    latest_pt = None
+    
+    if train_dirs:
+        # 시간순 정렬 (최신이 뒤로)
+        train_dirs.sort(key=os.path.getmtime)
+        latest_dir = train_dirs[-1]
+        last_pt_path = os.path.join(latest_dir, "weights", "last.pt")
+        
+        if os.path.exists(last_pt_path):
+            print(f"[Resume] 최근 체크포인트 발견: {last_pt_path}")
+            latest_pt = last_pt_path
+    
+    if latest_pt:
+        model = RTDETR(latest_pt)
+        resume_training = True
+    else:
+        print("[Setup] 새로운 학습 시작")
+        model_yaml = "smoke-detr-paper.yaml"
+        model = RTDETR(model_yaml)
+        resume_training = False
+
+    # Gradient Clipping 콜백 추가
+    def on_train_batch_end(trainer):
+        if trainer.model:
+            torch.nn.utils.clip_grad_norm_(trainer.model.parameters(), max_norm=10.0)
+            
+    model.add_callback("on_train_batch_end", on_train_batch_end)
+    
+    # 2. 데이터셋 설정
     # =========================================
     # 3. 학습 (논문 하이퍼파라미터)
     # =========================================
     results = model.train(
         data=data_yaml,
+        resume=resume_training,
         epochs=200,              # 논문: 200 epochs
         imgsz=640,               # 논문: 640x640
         batch=8,                 # 논문: batch_size=4, 속도 위해 8로 변경
