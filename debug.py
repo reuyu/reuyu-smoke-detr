@@ -17,7 +17,7 @@ def debug_model():
         print("✅ Model loaded successfully!")
     except Exception as e:
         print(f"❌ Error loading model: {e}")
-        print("💡 Tip: tasks.py에 모듈 등록이 잘 되었는지, smoke_modules.py에 오타가 없는지 확인하세요.")
+        
         return
 
     # 2. 모델 구조 출력 (우리가 만든 모듈 이름이 보여야 함)
@@ -61,7 +61,6 @@ def debug_model():
         
     except Exception as e:
         print(f"❌ Error during forward pass: {e}")
-        print("💡 Tip: 채널 수(ch)나 차원(stride) 계산이 맞지 않을 수 있습니다. smoke_modules.py의 forward 부분을 확인하세요.")
 
 if __name__ == "__main__":
     debug_model()

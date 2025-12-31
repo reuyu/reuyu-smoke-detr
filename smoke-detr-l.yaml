@@ -1,7 +1,7 @@
 # C:\Users\user\Documents\Projects\smoke-detr-l.yaml (수정본)
 
 # 파라미터
-nc: 1 # 클래스 수 (연기 1개)
+nc: 2 # 클래스 수 (연기 1개)
 scales:
   # 기존 논문에서 사용된 ResNet 스케일과 유사하게 맞춥니다 (r18.yaml 참고)
   l: [0.33, 0.25, 256]

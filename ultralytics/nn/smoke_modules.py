@@ -118,8 +118,8 @@ class ECPConv(nn.Module):
         # 논문 3.4절: "unselected channels... utilized by two 1×1 convolutions
         # of the intermediate entrainment BN and ReLU functions"
         self.rest_conv = nn.Sequential(
-            Conv(c1, c1, 1, s, act=True),   # 1x1 Conv + BN + ReLU (stride 적용)
-            Conv(c1, c1, 1, 1, act=False)   # 1x1 Conv (no activation)
+            Conv(c1, c1, 1, s, act=nn.ReLU(inplace=True)),
+            Conv(c1, c1, 1, 1, act=False)
         )
         
         # 3. Channel Projection (c1 -> c2)
@@ -196,8 +196,11 @@ class ECPConvBlock(nn.Module):
         out = self.ecp_conv(x)
         out = self.bn_relu(out)
         
+        # EMA first (Residual Branch 내에 위치)
+        out = self.ema(out) 
+        
+        # Then Add (Identity Preservation)
         out = out + identity
-        out = self.ema(out) # EMA enhances the result
         return out
 
 # -----------------------------------------------------------------
@@ -219,7 +222,7 @@ class RCM(nn.Module):
         
         # Strip Convolutions - 논문 Eq(5) 순차 처리
         # SConv_{1×k} → BN → ReLU → SConv_{k×1} → Sigmoid
-        self.sconv_1xk = Conv(c1, c1, (1, k), 1, act=True)   # 1×k + BN + ReLU
+        self.sconv_1xk = Conv(c1, c1, (1, k), 1, act=nn.ReLU(inplace=True))   # 1×k + BN + ReLU
         self.sconv_kx1 = Conv(c1, c1, (k, 1), 1, act=False)  # k×1 (no activation, sigmoid later)
         
         self.sigmoid = nn.Sigmoid()
@@ -299,19 +302,22 @@ class SmokeMFFPN(nn.Module):
         # 2. Foreground Feature Fusion (Eq 9, 10, 11)
         # P5 calculation
         p5_base = self.rcm_f5(f5)
-        p5 = p5_base * f5_prime # Interpolated multiplication (sizes match here)
+        # Sigmoid 추가: Attention Weights로 변환 (0~1)
+        p5 = p5_base * f5_prime.sigmoid() 
         
         # P4 calculation
         p5_up = F.interpolate(p5, size=s4.shape[2:], mode='bilinear')
         s4_base = self.rcm_s4(s4)
         s4_prime_up = F.interpolate(s4_prime, size=s4.shape[2:], mode='bilinear')
-        p4 = (s4_base + p5_up) * s4_prime_up
+        # Sigmoid 추가
+        p4 = (s4_base + p5_up) * s4_prime_up.sigmoid()
         
         # P3 calculation
         p4_up = F.interpolate(p4, size=s3.shape[2:], mode='bilinear')
         s3_base = self.rcm_s3(s3)
         s3_prime_up = F.interpolate(s3_prime, size=s3.shape[2:], mode='bilinear')
-        p3 = (s3_base + p4_up) * s3_prime_up
+        # Sigmoid 추가
+        p3 = (s3_base + p4_up) * s3_prime_up.sigmoid()
         
         # 3. Output Generation (Eq 12-15)
         # C1 (from P3)

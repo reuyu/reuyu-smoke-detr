@@ -13,7 +13,9 @@ Smoke-DETR Training & Evaluation Script
 """
 
 import os
+import sys
 import json
+import torch
 import datetime
 from pathlib import Path
 from ultralytics import RTDETR
@@ -24,7 +26,22 @@ def train_smoke_detr():
     # =========================================
     # 1. 모델 및 설정
     # =========================================
-    model_yaml = "smoke-detr-paper.yaml"  # Smoke-DETR 아키텍처
+    # model_yaml = "smoke-detr-paper.yaml"  # Smoke-DETR 아키텍처
+    
+    # =========================================
+    # 2. 모델 초기화
+    # =========================================
+    model_yaml = "smoke-detr-paper.yaml"
+    model = RTDETR(model_yaml)
+    
+    # Gradient Clipping 콜백 추가
+    def on_train_batch_end(trainer):
+        if trainer.model:
+            torch.nn.utils.clip_grad_norm_(trainer.model.parameters(), max_norm=10.0)
+            
+    model.add_callback("on_train_batch_end", on_train_batch_end)
+    
+    # 2. 데이터셋 설정
     data_yaml = "smoke_dataset.yaml"      # 연기 데이터셋
     
     # 결과 저장 디렉토리
@@ -40,9 +57,9 @@ def train_smoke_detr():
     print("=" * 60)
     
     # =========================================
-    # 2. 모델 초기화
+    # 2. 모델 초기화 (이미 위에서 수행됨)
     # =========================================
-    model = RTDETR(model_yaml)
+    # model = RTDETR(model_yaml) # 중복 제거
     
     # =========================================
     # 3. 학습 (논문 하이퍼파라미터)
@@ -51,9 +68,9 @@ def train_smoke_detr():
         data=data_yaml,
         epochs=200,              # 논문: 200 epochs
         imgsz=640,               # 논문: 640x640
-        batch=4,                 # 논문: batch_size=4
+        batch=8,                 # 논문: batch_size=4, 속도 위해 8로 변경
         optimizer="AdamW",       # 논문: AdamW
-        lr0=0.0001,              # 논문: Initial LR = 0.0001
+        lr0=0.0001,             # 학습 안정화를 위해 10배 감소 (0.0001 -> 0.00001)
         lrf=1.0,                 # 논문: Final LR = 1.0 (multiplier)
         momentum=0.9,            # 논문: Momentum = 0.9
         weight_decay=0.0001,     # 논문: Weight Decay = 0.0001
@@ -67,7 +84,6 @@ def train_smoke_detr():
         patience=0,              # Early stopping 비활성화 (200 에포크 완전 학습)
         verbose=True,
         workers=0,           # Windows multiprocessing 호환성
-        classes=[0],         # smoke(0) 클래스만 학습 (fire 제외)
     )
     
     print("\n" + "=" * 60)

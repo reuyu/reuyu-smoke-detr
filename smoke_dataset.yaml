@@ -4,7 +4,6 @@ val: images/val
 test: images/test
 
 # Classes
-nc: 2
+nc: 1
 names:
   0: smoke
-  1: fire
