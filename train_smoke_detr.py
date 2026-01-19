@@ -144,6 +144,7 @@ def evaluate_and_save_results(model, save_dir):
         save_json=True,    # COCO format JSON 저장
         plots=True,        # PR curve, confusion matrix 등 저장
         verbose=True,
+        workers=0,
     )
     
     # =========================================

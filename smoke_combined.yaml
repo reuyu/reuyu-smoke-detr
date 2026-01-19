@@ -1,0 +1,12 @@
+path: C:/Users/user/Documents/Projects/datasets # Absolute path for safety
+train:
+  - smoke/images/train
+  - pyro_sdis/images/train
+val:
+  - smoke/images/val
+  - pyro_sdis/images/val
+
+# Classes
+nc: 1
+names:
+  0: smoke
