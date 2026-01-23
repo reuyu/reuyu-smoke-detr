@@ -12,48 +12,46 @@ except ImportError as e:
 
 def main():
     print("=" * 60)
-    print("Smoke-DETR Extended Training Phase 2 (ECPConv A1 Fixed)")
-    print("Base: ecpconv_a1_200ep | Adding: 200 Epochs")
+    print("Smoke-DETR Deep Backbone Training (Resume Capable)")
+    print("Backbone: [3, 4, 6, 3] (ResNet-50 Style)")
+    print("Dataset: Original | Epochs: 200")
     print("=" * 60)
 
-    # 1. 이전 학습 체크포인트 로드
-    prev_run = 'runs/smoke_detr_fixed/ecpconv_a1_200ep'
-    last_pt = os.path.join(prev_run, 'weights', 'last.pt')
-    
-    # Phase 2가 이미 진행 중인지 확인
-    current_project = 'runs/smoke_detr_fixed'
-    current_name = 'ecpconv_a1_phase2_200ep'
-    phase2_last = os.path.join(current_project, current_name, 'weights', 'last.pt')
-    
-    if os.path.exists(phase2_last):
-        print(f"[Info] Resuming Phase 2 from {phase2_last}")
-        model = RTDETR(phase2_last)
-        resume_mode = True
-    elif os.path.exists(last_pt):
-        print(f"[Info] Starting Phase 2 from {last_pt}")
-        model = RTDETR(last_pt)
-        resume_mode = False  # 이미 끝난 모델이므로 새 학습으로 시작
-    else:
-        print(f"[Error] No checkpoint found at {last_pt}")
-        return
+    # 저장 경로 및 체크포인트 파일 경로 정의
+    project_path = 'runs/smoke_detr_deep'
+    run_name = 'resnet50_style_200ep'
+    last_ckpt = f"{project_path}/{run_name}/weights/last.pt"
 
-    # 2. 추가 학습
-    model.train(
-        data='smoke_dataset.yaml',
-        epochs=200,                  # 200 더
-        imgsz=640,
-        batch=10,
-        lr0=0.0001,
-        lrf=0.01,
-        workers=0,
-        project=current_project,
-        name=current_name,
-        save=True,
-        plots=True,
-        exist_ok=True,
-        amp=True,
-        resume=resume_mode
-    )
+    # 1. 체크포인트 존재 여부 확인 후 모델 로드
+    if os.path.exists(last_ckpt):
+        print(f"[Info] Resuming training from {last_ckpt}...")
+        model = RTDETR(last_ckpt)  # .pt 파일로 모델 로드
+        resume_training = True
+    else:
+        print("[Info] Initializing new model from smoke-detr-deep.yaml...")
+        model = RTDETR("smoke-detr-deep.yaml")  # 새 구조 로드
+        resume_training = False
+
+    # 2. Training 실행
+    # resume=True는 .pt 파일을 로드했을 때만 동작하므로 분기 처리 혹은 인자 전달
+    if resume_training:
+        model.train(resume=True) # resume=True만 주면 기존 설정 그대로 이어감
+    else:
+        model.train(
+            data='smoke_dataset.yaml',
+            epochs=200,
+            imgsz=640,
+            batch=8,
+            lr0=0.0001,
+            lrf=0.01,
+            workers=0,
+            project=project_path,
+            name=run_name,
+            save=True,
+            plots=True,
+            exist_ok=True,
+            amp=True
+        )
 
 if __name__ == "__main__":
     main()
